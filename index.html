@@ -26,7 +26,7 @@ th{background:#eee}
 
 <body>
 <header>
-<h2>Prometric CBT – Nurse Technician (Full Proctoring)
+<h2>Prometric CBT – Nurse Technician
 <span id="timer"></span>
 </h2>
 </header>
@@ -60,9 +60,9 @@ th{background:#eee}
 
 <section id="admin" class="hidden">
 <div class="card">
-<h3>Admin / Proctor Dashboard</h3>
-<button onclick="exportJSON()">Export JSON</button>
-<button onclick="exportCSV()" class="secondary">Export CSV</button>
+<h3>Admin / Psychometric Dashboard</h3>
+<button onclick="exportJSON()">Export JSON (Full)</button>
+<button onclick="exportCSV()" class="secondary">Export CSV (Summary)</button>
 <table id="adminTable">
 <tr>
 <th>Name</th>
@@ -89,174 +89,99 @@ const PASS_MARK=70;
 /* ================= QUESTION BANK ================= */
 const bank=[];
 function q(qtext,opts,ans,dom,ff,hs){
-bank.push({q:qtext,o:opts,a:ans,domain:dom,failFast:ff,hardStop:hs});
+bank.push({
+q:qtext,o:opts,a:ans,domain:dom,
+failFast:ff,hardStop:hs,
+stats:{attempt:0,correct:0}
+});
 }
 
-/* ================= 60 HIGH-LEVEL MCQ (A–D ONLY) ================= */
-let n=1;
+/* === 60 HIGH-LEVEL ITEMS (A–D) === */
+let i=1;
 while(bank.length<60){
 q(
-`Scenario ${n}: A postoperative patient suddenly becomes anxious, tachypneic, and SpO₂ drops to 88%. What is the MOST appropriate immediate action?`,
+`Scenario ${i}: A postoperative patient becomes tachypneic with SpO₂ 88%. What is the MOST appropriate immediate action?`,
 [
-"Document the finding and reassess in 30 minutes",
-"Position the patient upright and notify the nurse immediately",
-"Encourage the patient to relax and breathe slowly",
-"Check temperature before taking further action"
+"Document and reassess later",
+"Position upright and notify nurse immediately",
+"Encourage slow breathing",
+"Check temperature first"
 ],
-1,
-"Patient Safety",
-true,
-false
+1,"Patient Safety",true,false
 );
-
 q(
-`Scenario ${n+1}: During ambulation, a patient reports dizziness and begins to lose balance. What should you do FIRST?`,
+`Scenario ${i+1}: During ambulation, a patient reports dizziness and begins to fall. What should you do FIRST?`,
 [
-"Support the patient and continue ambulation",
+"Continue ambulation with support",
 "Lower the patient safely to the floor",
-"Call for assistance after completing the transfer",
-"Document the incident at end of shift"
+"Call for help after transfer",
+"Document at end of shift"
 ],
-1,
-"Patient Safety",
-true,
-false
+1,"Patient Safety",true,false
 );
-
 q(
-`Scenario ${n+2}: While providing hygiene care, you observe non-blanchable redness over the sacral area. What is your PRIORITY action?`,
+`Scenario ${i+2}: You note non-blanchable redness on the sacrum. What is your PRIORITY action?`,
 [
-"Apply moisturizing lotion",
-"Reposition the patient and report to the nurse",
-"Ignore since the patient reports no pain",
-"Document the finding later"
+"Apply lotion",
+"Reposition and report to nurse",
+"Ignore if painless",
+"Document later"
 ],
-1,
-"Basic Nursing Care",
-false,
-false
+1,"Basic Nursing Care",false,false
 );
-
 q(
-`Scenario ${n+3}: After removing gloves following patient care, what is the REQUIRED next action?`,
+`Scenario ${i+3}: Which finding requires IMMEDIATE reporting?`,
 [
-"Dispose of linen",
-"Perform hand hygiene",
-"Leave the room immediately",
-"Remove gown"
-],
-1,
-"Infection Control",
-false,
-false
-);
-
-q(
-`Scenario ${n+4}: Which vital sign finding requires IMMEDIATE reporting?`,
-[
-"Blood pressure 118/76 mmHg",
+"BP 120/78 mmHg",
 "Respiratory rate 30/min",
-"Temperature 36.8°C",
-"Pulse 74/min"
+"Temperature 36.9°C",
+"Pulse 76/min"
 ],
-1,
-"Measurement & Vitals",
-true,
-false
+1,"Measurement & Vitals",true,false
 );
-
 q(
-`Scenario ${n+5}: A family member asks you about the patient’s diagnosis. What is the MOST appropriate response?`,
+`Scenario ${i+4}: A family asks about diagnosis details. What is the MOST appropriate response?`,
 [
-"Explain the diagnosis using simple terms",
-"State you are not permitted to discuss and will notify the nurse",
-"Provide reassurance without answering the question",
-"Ignore the question"
+"Explain diagnosis",
+"Refer to nurse",
+"Reassure only",
+"Ignore question"
 ],
-1,
-"Communication & Ethics",
-false,
-false
+1,"Communication & Ethics",false,false
 );
-
 q(
-`Scenario ${n+6}: You are instructed to independently administer IV medication due to staff shortage. What is the CORRECT action?`,
+`Scenario ${i+5}: You are asked to administer IV medication independently. What is the CORRECT action?`,
 [
-"Administer the medication to avoid delay",
-"Refuse and immediately notify the supervising nurse",
-"Ask another technician for guidance",
-"Document the instruction and proceed"
+"Administer to avoid delay",
+"Refuse and notify supervising nurse",
+"Ask another technician",
+"Document and proceed"
 ],
-1,
-"Scope / Legal",
-false,
-true
+1,"Scope / Legal",false,true
 );
-
-n+=7;
+i+=6;
 }
 
 /* ================= ENGINE ================= */
 let idx=0,answers=[],responseLog=[],users=[],currentUser=null;
 
-/* ================= HARDENED PROCTOR ================= */
-let examStarted=false;
-let blurCount=0;
-const maxBlur=2;
-let remainingSeconds=60*60;
-let timerInt=null;
-
+/* ================= PROCTOR ================= */
+let examStarted=false,remainingSeconds=3600,timerInt=null;
 function startProctoring(){
 examStarted=true;
 timerInt=setInterval(()=>{
 remainingSeconds--;
 document.getElementById("timer").innerText=
-" | Time Left: "+Math.floor(remainingSeconds/60)+":"+String(remainingSeconds%60).padStart(2,"0");
-if(remainingSeconds<=0){
-registerViolation("TIME_EXPIRED");
-endTest(true);
-}
+"Time Left: "+Math.floor(remainingSeconds/60)+":"+String(remainingSeconds%60).padStart(2,"0");
+if(remainingSeconds<=0) endTest(true);
 },1000);
-
-document.addEventListener("visibilitychange",()=>{
-if(document.hidden && examStarted){
-registerViolation("TAB_SWITCH");
-}
-});
-
-window.addEventListener("blur",()=>{
-if(examStarted){
-blurCount++;
-registerViolation("WINDOW_BLUR");
-if(blurCount>maxBlur){
-registerViolation("FORCE_TERMINATION");
-endTest(true);
-}
-}
-});
-
-document.addEventListener("contextmenu",e=>{
-if(examStarted){e.preventDefault();registerViolation("RIGHT_CLICK");}
-});
-
-document.addEventListener("keydown",e=>{
-if(!examStarted) return;
-if((e.ctrlKey && ["c","v","x"].includes(e.key.toLowerCase())) || e.key==="PrintScreen"){
-e.preventDefault();
-registerViolation("KEYBOARD_BLOCKED");
-}
-});
-}
-
-function registerViolation(type){
-currentUser.violations.push(type+" @ "+new Date().toISOString());
 }
 
 /* ================= FLOW ================= */
 function startTest(){
 const name=document.getElementById("nameInput").value.trim();
-if(!name){alert("Name required");return;}
-currentUser={name,violations:[]};
+if(!name) return alert("Name required");
+currentUser={name,violations:[],responses:[]};
 document.getElementById("login").classList.add("hidden");
 document.getElementById("exam").classList.remove("hidden");
 startProctoring();
@@ -265,10 +190,7 @@ renderQ();
 
 function renderQ(){
 const b=bank[idx];
-document.getElementById("meta").innerHTML=
-`Q ${idx+1}/${bank.length} – ${b.domain}
-${b.failFast?'<span class="badge failfast">FAIL-FAST</span>':''}
-${b.hardStop?'<span class="badge hardstop">HARD-STOP</span>':''}`;
+document.getElementById("meta").innerHTML=`Q ${idx+1}/${bank.length} – ${b.domain}`;
 document.getElementById("qtext").innerText=b.q;
 const opt=document.getElementById("options");
 opt.innerHTML="";
@@ -282,33 +204,31 @@ opt.appendChild(d);
 }
 
 function nextQ(){
-if(answers[idx]==null){alert("Select an option");return;}
+if(answers[idx]==null) return alert("Select an option");
 const b=bank[idx];
+b.stats.attempt++;
 const correct=answers[idx]===b.a;
-responseLog.push({domain:b.domain,correct});
-if(!correct && (b.failFast||b.hardStop)){
-registerViolation("CRITICAL_ERROR_Q"+(idx+1));
-endTest(true);return;
-}
+if(correct) b.stats.correct++;
+currentUser.responses.push({q:idx,selected:answers[idx],correct});
+if(!correct && (b.failFast||b.hardStop)) return endTest(true);
 idx++;
 idx>=bank.length?endTest(false):renderQ();
 }
 
 function endTest(forceFail){
-examStarted=false;
 clearInterval(timerInt);
 document.getElementById("exam").classList.add("hidden");
 document.getElementById("result").classList.remove("hidden");
 
 let score=0;
 for(const d in DOMAIN_WEIGHT){
-const items=responseLog.filter(r=>r.domain===d);
+const items=currentUser.responses.filter(r=>bank[r.q].domain===d);
 if(items.length){
 score+=(items.filter(r=>r.correct).length/items.length)*DOMAIN_WEIGHT[d]*100;
 }
 }
 score=Math.round(forceFail?0:score);
-const pass=score>=PASS_MARK && currentUser.violations.length===0;
+const pass=score>=PASS_MARK;
 currentUser.score=score;
 currentUser.result=pass?"PASS":"FAIL";
 users.push(currentUser);
@@ -316,8 +236,52 @@ users.push(currentUser);
 document.getElementById("resultBox").innerHTML=
 `Name: ${currentUser.name}<br>
 Score: <b>${score}%</b><br>
-Result: <b style="color:${pass?'green':'red'}">${currentUser.result}</b><br>
-Violations: ${currentUser.violations.length}`;
+Result: <b>${currentUser.result}</b>`;
+}
+
+function showAdmin(){
+document.getElementById("result").classList.add("hidden");
+document.getElementById("admin").classList.remove("hidden");
+const t=document.getElementById("adminTable");
+users.forEach(u=>{
+const r=t.insertRow();
+r.insertCell().innerText=u.name;
+r.insertCell().innerText=u.score+"%";
+r.insertCell().innerText=u.result;
+r.insertCell().innerText=u.violations.length;
+});
+}
+
+/* ================= EXPORT ================= */
+function exportJSON(){
+const report={
+candidates:users,
+itemStats:bank.map((b,i)=>({
+item:i+1,
+domain:b.domain,
+attempt:b.stats.attempt,
+correct:b.stats.correct,
+pValue:b.stats.attempt? (b.stats.correct/b.stats.attempt).toFixed(2):"NA",
+difficulty:
+b.stats.attempt?
+(b.stats.correct/b.stats.attempt>=0.8?"Easy":
+b.stats.correct/b.stats.attempt>=0.3?"Moderate":"Hard")
+:"NA"
+}))
+};
+download(JSON.stringify(report,null,2),"full_report.json");
+}
+
+function exportCSV(){
+let c="Name,Score,Result\n";
+users.forEach(u=>c+=`${u.name},${u.score},${u.result}\n`);
+download(c,"summary.csv");
+}
+
+function download(data,name){
+const b=new Blob([data],{type:"text/plain"});
+const a=document.createElement("a");
+a.href=URL.createObjectURL(b);a.download=name;a.click();
 }
 </script>
 </body>
